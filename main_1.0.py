@@ -1,11 +1,3 @@
-################################################################################
-#                     PERSONAL VOICE ASSISTANT - MAIN.PY                        #
-#                                                                              #
-# Wake-word: "garmin"                                                          #
-# Fuzzy command recognition via RapidFuzz                                       #
-# Faster Whisper tiny.en for offline ASR                                         #
-################################################################################
-
 import sounddevice as sd
 import numpy as np
 import queue
@@ -18,23 +10,17 @@ from command_matcher import load_commands, find_best_match
 import os
 import sys
 
-################################################################################
-# SETTINGS
-################################################################################
 WAKE_WORD = "garmin"
 SAMPLE_RATE = 16000
 CHUNK_DURATION = 0.5
 PAUSE_THRESHOLD = 1.0
 MIN_COMMAND_DURATION = 1.0
 DEVICE_INDEX = None
-WAKE_WORD_DELAY = 1.2      # delay after beep before recording command
-WAKE_DEBOUNCE = 2.0        # min interval between wake-word triggers (seconds)
+WAKE_WORD_DELAY = 1.2
+WAKE_DEBOUNCE = 2.0
 
 COMMANDS_CSV = "commands.csv"
 
-################################################################################
-# GLOBALS
-################################################################################
 audio_queue = queue.Queue()
 rolling_buffer = deque(maxlen=int(3 * SAMPLE_RATE))
 command_buffer = []
@@ -43,11 +29,8 @@ wake_detected = False
 last_speech_time = time.time()
 command_start_delay = 0.0
 buffer_lock = threading.Lock()
-last_wake_time = 0  # last wake-word timestamp
+last_wake_time = 0
 
-################################################################################
-# UTILITY FUNCTIONS
-################################################################################
 def play_beep():
     duration = 0.2
     t = np.linspace(0, duration, int(SAMPLE_RATE * duration), False)
@@ -64,13 +47,10 @@ def reset_recording():
     wake_detected = False
     recording = False
 
-################################################################################
-# LOAD MODEL AND COMMANDS
-################################################################################
 print("Loading Faster Whisper model...")
 try:
     model = WhisperModel("tiny.en", device="cpu", compute_type="int8")
-    print("Whisper model loaded.")
+    print("Whisper model loaded successfully.")
 except Exception as e:
     print("Error loading model:", e)
     sys.exit(1)
@@ -79,19 +59,22 @@ commands = load_commands(COMMANDS_CSV)
 if not commands:
     print("No commands loaded. Exiting.")
     sys.exit(1)
+else:
+    print(f"[LOADED] {len(commands)} commands from {COMMANDS_CSV}")
 
-################################################################################
-# WAKE-WORD DETECTION
-################################################################################
 def detect_wake_word(audio):
     global wake_detected, recording, command_start_delay, last_wake_time
     now = time.time()
     if wake_detected or now - last_wake_time < WAKE_DEBOUNCE:
         return
     try:
-        segments, _ = model.transcribe(np.array(audio, dtype=np.float32),
-                                       language="en", beam_size=1)
-        text = " ".join([seg.text for seg in segments if hasattr(seg, "text") and seg.text.strip()]).lower()
+        segments, _ = model.transcribe(
+            np.array(audio, dtype=np.float32),
+            language="en",
+            beam_size=1,
+            vad_filter=True
+        )
+        text = " ".join([seg.text for seg in segments if hasattr(seg, "text")]).lower()
         if WAKE_WORD in text:
             wake_detected = True
             recording = True
@@ -100,7 +83,6 @@ def detect_wake_word(audio):
             last_wake_time = now
             print(f"\n[WAKE WORD DETECTED: {WAKE_WORD.upper()}]")
             threading.Thread(target=play_beep, daemon=True).start()
-            # Clear buffers
             with buffer_lock:
                 rolling_buffer.clear()
             with audio_queue.mutex:
@@ -108,26 +90,25 @@ def detect_wake_word(audio):
     except Exception as e:
         print("Wake-word error:", e)
 
-################################################################################
-# AUDIO CALLBACK
-################################################################################
 def audio_callback(indata, frames, time_info, status):
     if status:
         print("Audio status:", status)
     chunk = indata.copy().flatten().astype(np.float32)
     audio_queue.put(chunk)
 
-################################################################################
-# COMMAND TRANSCRIPTION
-################################################################################
 def transcribe_command():
     if not command_buffer:
         return
     audio = np.array(command_buffer, dtype=np.float32)
     print("Transcribing command...")
     try:
-        segments, _ = model.transcribe(audio, language="en", beam_size=3)
-        text = " ".join([seg.text for seg in segments if hasattr(seg, "text") and seg.text.strip()]).lower()
+        segments, _ = model.transcribe(
+            audio,
+            language="en",
+            beam_size=3,
+            vad_filter=True
+        )
+        text = " ".join([seg.text for seg in segments if hasattr(seg, "text")]).lower()
         text = text.replace(WAKE_WORD, "").strip()
         if not text:
             print("Empty command")
@@ -148,9 +129,6 @@ def transcribe_command():
         print("Transcription error:", e)
     reset_recording()
 
-################################################################################
-# WORKER THREAD
-################################################################################
 def worker():
     global last_speech_time
     print(f"Say '{WAKE_WORD}' to activate the assistant...\n")
@@ -160,10 +138,8 @@ def worker():
             break
         with buffer_lock:
             rolling_buffer.extend(chunk)
-        # Detect wake word once per buffer
         if not wake_detected and len(rolling_buffer) >= SAMPLE_RATE*0.5:
             threading.Thread(target=detect_wake_word, args=(list(rolling_buffer),), daemon=True).start()
-        # Handle recording
         if wake_detected:
             current_time = time.time()
             if current_time < command_start_delay:
@@ -181,9 +157,6 @@ def worker():
                 transcribe_command()
                 reset_recording()
 
-################################################################################
-# MAIN EXECUTION
-################################################################################
 def main():
     try:
         stream = sd.InputStream(
