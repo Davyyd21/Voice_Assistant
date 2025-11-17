@@ -1,3 +1,4 @@
+#librarii
 import sounddevice as sd
 import numpy as np
 import queue
@@ -7,10 +8,11 @@ import subprocess
 from faster_whisper import WhisperModel
 from collections import deque
 from command_matcher import load_commands, find_best_match
-import os
+#import os
 import sys
 import torch
 
+#variabile globale
 WAKE_WORD = "garmin"
 SAMPLE_RATE = 16000
 CHUNK_DURATION = 0.5
@@ -32,6 +34,7 @@ command_start_delay = 0.0
 buffer_lock = threading.Lock()
 last_wake_time = 0
 
+#beep la wake word
 def play_beep():
     duration = 0.2
     t = np.linspace(0, duration, int(SAMPLE_RATE * duration), False)
@@ -39,16 +42,19 @@ def play_beep():
     sd.play(tone, samplerate=SAMPLE_RATE)
     sd.wait()
 
+#recunoaste daca un array este vorbit sau doar noise
 def is_speech(chunk, threshold=0.01):
     return np.mean(np.abs(chunk)) > threshold
 
+#reseteaza variabilele pentru recording
 def reset_recording():
     global command_buffer, wake_detected, recording
     command_buffer = []
     wake_detected = False
     recording = False
 
-print("Loading Faster Whisper model...")
+#incarcare model whisper
+print("Loading Whisper...")
 try:
     print("Is cuda avalable: ",torch.cuda.is_available(),"version",torch.version.cuda)
     device_1 = "cuda" if torch.cuda.is_available() else "cpu"
@@ -61,13 +67,15 @@ except Exception as e:
     print("Error loading model:", e)
     sys.exit(1)
 
+#incarcare comenzi
 commands = load_commands(COMMANDS_CSV)
 if not commands:
     print("No commands loaded. Exiting.")
     sys.exit(1)
 else:
-    print(f"[LOADED] {len(commands)} commands from {COMMANDS_CSV}")
+    print(f"Loaded {len(commands)} commands from {COMMANDS_CSV}")
 
+#functie detectie wake word
 def detect_wake_word(audio):
     global wake_detected, recording, command_start_delay, last_wake_time
     now = time.time()
@@ -96,12 +104,14 @@ def detect_wake_word(audio):
     except Exception as e:
         print("Wake-word error:", e)
 
+#callback adaugare audio in coada
 def audio_callback(indata, frames, time_info, status):
     if status:
         print("Audio status:", status)
     chunk = indata.copy().flatten().astype(np.float32)
     audio_queue.put(chunk)
 
+#transcribe command+afisare best match
 def transcribe_command():
     if not command_buffer:
         return
@@ -124,7 +134,7 @@ def transcribe_command():
         result = find_best_match(text, commands, cutoff=70)
         if result:
             key, action, score = result
-            print(f"[MATCH] '{key}' (score: {score:.1f}%)")
+            print(f"Match '{key}' (score: {score:.1f}%)")
             try:
                 subprocess.Popen(action, shell=True)
             except Exception as e:
@@ -135,6 +145,7 @@ def transcribe_command():
         print("Transcription error:", e)
     reset_recording()
 
+#worker-thread care integreaza si uneste toate functiile de transcribe
 def worker():
     global last_speech_time
     print(f"Say '{WAKE_WORD}' to activate the assistant...\n")
@@ -163,6 +174,7 @@ def worker():
                 transcribe_command()
                 reset_recording()
 
+#functia main a programului
 def main():
     try:
         stream = sd.InputStream(
