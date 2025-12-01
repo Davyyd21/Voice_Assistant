@@ -35,7 +35,6 @@ The system is optimized for low latency, continuous audio streaming, robust wake
        └────────────────────┘
                  │
                  ▼
-       (Future) SSH → Raspberry Pi → Run scripts
 ```
 
 ---
@@ -264,12 +263,10 @@ Quick start (recommended setup):
 3. On your laptop (voice recognition computer) set the broker and optionally topic, then run the assistant
 
   ```bash
-  export MQTT_BROKER=192.168.1.42   # set to Pi's IP or hostname
-  export MQTT_PORT=1883
+  export MQTT_BROKER=   # set to Pi's IP or hostname
+  export MQTT_PORT= # set to port
   export MQTT_TOPIC=voice/commands
   python3 main_1.0.py
-
-If your Raspberry Pi is at 192.168.1.139 (as you mentioned), you can use the provided convenience scripts:
 
 On your laptop, run the assistant pre-configured to publish to that Pi:
 
@@ -280,14 +277,14 @@ On your laptop, run the assistant pre-configured to publish to that Pi:
 If you'd rather test only MQTT connectivity first, you can run the included test publisher (defaults to localhost):
 
 ```bash
-# Publish a test message to a Pi located at 192.168.1.139
-python3 ./scripts/test_mqtt_publish.py 192.168.1.139 1883 voice/commands
+# Publish a test message to a Pi located at <ip_addr>
+python3 ./scripts/test_mqtt_publish.py <ip_addr> <port> voice/commands
 ```
 
 Or with mosquitto_pub:
 
 ```bash
-mosquitto_pub -h 192.168.1.139 -t voice/commands -m '{"command":"turn_on_led","action":"echo "LED ON""}'
+mosquitto_pub -h <ip_addr> -t voice/commands -m '{"command":"turn_on_led","action":"echo "LED ON""}'
 ```
   ```
 
