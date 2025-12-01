@@ -230,6 +230,111 @@ Run assistant:
 
 ```bash
 python main.py
+
+---
+
+# ✅ MQTT-based Raspberry Pi integration (new)
+
+This repository now supports forwarding recognized voice commands over MQTT to a Raspberry Pi so the Pi can perform real hardware actions (GPIO). Two scripts are included:
+
+- `main_1.0.py` — still performs recognition locally but now publishes a JSON payload to an MQTT topic when a command is matched.
+- `pi_mqtt_subscriber.py` — run this on the Raspberry Pi; it subscribes to the topic and runs mapped GPIO actions (uses gpiozero).
+
+How it works:
+
+1. The assistant recognizes a command variant (from `commands.csv`).
+2. Instead of — or in addition to — running the local `action` command, it publishes a JSON payload like:
+
+  {
+    "command": "turn_on_led",
+    "action": "echo \"LED ON\"",
+    "score": 93.4
+  }
+
+3. The Pi listener receives the message and runs the mapped GPIO behavior.
+
+Quick start (recommended setup):
+
+1. Install Mosquitto on the Raspberry Pi as a broker (or run a broker on the laptop):
+
+  ```bash
+  sudo apt update && sudo apt install -y mosquitto mosquitto-clients
+  sudo systemctl enable --now mosquitto
+  ```
+
+2. On the Raspberry Pi, install the Python requirements and start the subscriber:
+
+  Option A — manual (pip3):
+
+  ```bash
+  # ensure pip for python3 is installed, then install requirements
+  sudo apt update
+  sudo apt install -y python3-pip
+  pip3 install -r requirements.txt
+
+  # Run the subscriber (edit PIN_CONFIG in pi_mqtt_subscriber.py first to match your wiring)
+  python3 pi_mqtt_subscriber.py
+  ```
+
+  Option B — use the provided helper script (recommended):
+
+  ```bash
+  chmod +x ./scripts/install_pi_requirements.sh
+  ./scripts/install_pi_requirements.sh
+  python3 pi_mqtt_subscriber.py
+  ```
+
+  Common fixes if you see ModuleNotFoundError (e.g. 'No module named paho'):
+  - Make sure you installed system pip for Python 3 (sudo apt install python3-pip)
+  - Use `pip3 install -r requirements.txt` on the Pi
+  - Or run the included installer script `./scripts/install_pi_requirements.sh`
+
+  - If the broker is remote, set MQTT_BROKER environment variable (e.g. export MQTT_BROKER="192.168.1.42").
+
+3. On your laptop (voice recognition computer) set the broker and optionally topic, then run the assistant
+
+  ```bash
+  export MQTT_BROKER=192.168.1.42   # set to Pi's IP or hostname
+  export MQTT_PORT=1883
+  export MQTT_TOPIC=voice/commands
+  python3 main_1.0.py
+
+If your Raspberry Pi is at 192.168.1.139 (as you mentioned), you can use the provided convenience scripts:
+
+On your laptop, run the assistant pre-configured to publish to that Pi:
+
+```bash
+./scripts/run_with_pi.sh
+```
+
+If you'd rather test only MQTT connectivity first, you can run the included test publisher (defaults to localhost):
+
+```bash
+# Publish a test message to a Pi located at 192.168.1.139
+python3 ./scripts/test_mqtt_publish.py 192.168.1.139 1883 voice/commands
+```
+
+Or with mosquitto_pub:
+
+```bash
+mosquitto_pub -h 192.168.1.139 -t voice/commands -m '{"command":"turn_on_led","action":"echo "LED ON""}'
+```
+  ```
+
+Notes & tips:
+
+- `pi_mqtt_subscriber.py` includes a `PIN_CONFIG` mapping at the top — change those pins to match your wiring.
+- The subscriber uses gpiozero and is designed to run on Raspberry Pi OS.
+- For debugging you can publish test messages using `mosquitto_pub`:
+
+  ```bash
+  mosquitto_pub -h <broker> -t voice/commands -m '{"command":"turn_on_led","action":"echo \"LED ON\""}'
+  ```
+
+Security:
+
+- This example uses an unauthenticated broker (local network). For production, secure Mosquitto with TLS and authentication.
+
 ```
 
 ---
