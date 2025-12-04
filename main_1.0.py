@@ -5,6 +5,8 @@ import queue
 import threading
 import time
 import subprocess
+import json
+import os
 from faster_whisper import WhisperModel
 from collections import deque
 from command_matcher import load_commands, find_best_match
@@ -70,7 +72,7 @@ except Exception as e:
     sys.exit(1)
 
 #incarcare comenzi
-var2act, var_vec = load_commands(COMMANDS_CSV)
+var2key, key2act, var_vec = load_commands(COMMANDS_CSV)
 if not var_vec:
     print("No data loaded. Exiting.")
     sys.exit(1)
@@ -133,7 +135,7 @@ def transcribe_command():
             reset_recording()
             return
         print(f"Command: '{text}'")
-        result = find_best_match(text, var2act,var_vec, cutoff=70)
+        result = find_best_match(text, var2key, key2act, var_vec, cutoff=70)
         if result:
             client.connect(host="192.168.1.139")
             action, score = result
