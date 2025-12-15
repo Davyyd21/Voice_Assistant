@@ -72,7 +72,7 @@ except Exception as e:
     sys.exit(1)
 
 #incarcare comenzi
-var2key, key2act, var_vec = load_commands(COMMANDS_CSV)
+var2act, var_vec = load_commands(COMMANDS_CSV)
 if not var_vec:
     print("No data loaded. Exiting.")
     sys.exit(1)
@@ -135,17 +135,14 @@ def transcribe_command():
             reset_recording()
             return
         print(f"Command: '{text}'")
-        result = find_best_match(text, var2key, key2act, var_vec, cutoff=70)
+        result = find_best_match(text, var2act, var_vec, cutoff=70)
         if result:
             client.connect(host="192.168.1.139")
+            print(f"{result}")
             action, score = result
             print(f"Match '{action}' (score: {score:.1f}%)")
             device, state = action.split(" ")
             client.publish(f"gpio/{device}", f"{state}")
-            try:
-                subprocess.Popen(action, shell=True)
-            except Exception as e:
-                print("Execution error:", e)
         else:
             print("No matching command found.")
     except Exception as e:
