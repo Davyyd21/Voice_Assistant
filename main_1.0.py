@@ -137,7 +137,7 @@ def transcribe_command():
         print(f"Command: '{text}'")
         result = find_best_match(text, var2act, var_vec, cutoff=70)
         if result:
-            client.connect(host="192.168.1.139")
+            client.connect(host="raspberry.local")
             print(f"{result}")
             action, score = result
             print(f"Match '{action}' (score: {score:.1f}%)")
